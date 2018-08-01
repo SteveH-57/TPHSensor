@@ -1,0 +1,176 @@
+
+<mat-toolbar layout="row">
+  <button class="menu" hide-gt-sm ng-click="$ctrl.toggleUsersList()" aria-label="Show User List">
+    <mat-icon md-svg-icon="menu"></mat-icon>
+  </button>
+  <h1>Temperature, Pressure and Humidity Readings</h1>
+</mat-toolbar>
+<div flex layout="row">
+
+  <div *ngIf="devices != null">
+    <div class="form-group">
+      <label for="status">Devices</label>
+      <select class="form-control" [(ngModel)]="device" (ngModelChange)='updateReadings($event)'>
+        <option *ngFor="let d of devices" [ngValue]="d">{{d.location}}({{d.description}} [{{d.deviceId.slice(-2)}}])</option>
+      </select>
+    </div>
+  </div>
+  <div *ngIf="device != null" class="alert alert-info">
+    <label>Account :</label> {{device.account}}
+    <label>Location:</label>{{device.location}}
+    <label>DeviceId:</label> {{device.deviceId}}
+    <label>Active  :</label>{{device.active}}
+    <label>Description:</label>{{device.description}}
+
+  </div>
+  <div *ngIf="!busy" class="row">
+    Found {{readings.length + aggregates.length}} records.
+    <form (ngSubmit)="updateReadings()">
+      <mat-form-field>
+        <mat-select [(value)]="displayType">
+          <mat-option value="">Details</mat-option>
+          <mat-option value="h">Hourly</mat-option>
+          <mat-option value="d">Daily</mat-option>
+          <mat-option value="m">Monthly</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!--<input type="date" [(ngModel)]="start" name="start" />
+      <input type="date" [(ngModel)]="finish" name="finish" />-->
+
+      <mat-form-field>
+        <input matInput [matDatepicker]="picker1" placeholder="Choose a start date" [formControl]="startDate">
+        <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+        <mat-datepicker #picker1></mat-datepicker>
+      </mat-form-field>
+
+
+      <mat-form-field>
+
+        <input matInput [matDatepicker]="finishPicker" placeholder="Choose a finish date" [formControl]="finishDate">
+        <mat-datepicker-toggle matSuffix [for]="finishPicker"></mat-datepicker-toggle>
+        <mat-datepicker #finishPicker></mat-datepicker>
+      </mat-form-field>
+
+
+
+
+      <span *ngIf="displayType !=''">
+        &nbsp;&nbsp;Get All devices <mat-checkbox [(ngModel)]="getAll" name="getAll"></mat-checkbox>
+      </span>
+      <button mat-button class="mat-raised-button"> Update</button>
+    </form>
+    <br />
+    <div>
+      <div class="col-md-12 col-lg-6">
+        <div *ngIf="getAll">
+          <button mat-button class="mat-raised-button" (click)="changedisplayAllType('t')" color="primary" value=""> Temperature</button>
+          <button mat-button class="mat-raised-button" (click)="changedisplayAllType('p')" value="Pressure">Pressure </button>
+          <button mat-button class="mat-raised-button" (click)="changedisplayAllType('h')" color="accent" value="Humidity"> Humidity</button>
+        </div>
+
+        <canvas baseChart id="chartArea"
+                style="background-color:lemonchiffon;"
+                [datasets]="lineChartData"
+                [labels]="readingDates"
+                [legend]="lineChartLegend"
+                [chartType]="lineChartType"
+                [colors]="lineChartColors"
+                [options]="lineChartOptions"></canvas>
+      </div>
+      <div class="col-md-12 col-lg-6" style="overflow-y:scroll;max-height: 61vh;">
+        <table class="table table-bordered table-responsive table-striped" *ngIf="gridType==''">
+          <thead>
+            <tr>
+              <th>Temperature</th>
+              <th>Pressure</th>
+              <th>Humidity</th>
+              <th>TimeStamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let reading of readings">
+              <td>{{reading.temperature | number:'2.1-1'}} &#176;F</td>
+              <td>{{reading.pressure | number:'2.1-1'}} inHG</td>
+              <td>{{reading.humidity | number:'2.1-1'}}%</td>
+              <th>{{reading.readAt  | date: 'MM/dd/yy hh:mm:ss a'}}</th>
+            </tr>
+          </tbody>
+        </table>
+        <table class="table table-bordered table-responsive table-striped" *ngIf="gridType!=''">
+          <thead>
+            <tr>
+              <th *ngIf="getAll">Location</th>
+              <th *ngIf="gridType=='h'">Hour (YYMMDDHH)</th>
+              <th *ngIf="gridType=='d'">Day (YYMMDD)</th>
+              <th *ngIf="gridType=='m'">Month (YYMM)</th>
+              <th>Temperature <br /> min / avg / max </th>
+              <th>Pressure <br /> min / avg / max </th>
+              <th>Humidity <br /> min / avg / max </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let reading of aggregates">
+              <td *ngIf="getAll">{{getText(reading.id)}}</td>
+              <th>{{reading.timeRange}}</th>
+              <td>
+                {{reading.temperature.minimum | number:'2.1-1'}} / {{reading.temperature.total / reading.temperature.count  | number:'2.1-1'}} / {{reading.temperature.maximum | number:'2.1-1'}}
+              </td>
+              <td>
+                {{reading.pressure.minimum | number:'2.1-1'}} / {{reading.pressure.total / reading.pressure.count | number:'2.1-1'}} / {{reading.pressure.maximum | number:'2.1-1'}}
+              </td>
+              <td>
+                {{reading.humidity.minimum | number:'2.1-1'}} / {{reading.humidity.total / reading.humidity.count | number:'2.1-1'}} / {{reading.humidity.maximum | number:'2.1-1'}}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div>
+      <table cdk-table [dataSource]="readings">
+        <tr>
+          <!--- Note that these columns can be defined in any order.
+  The actual rendered columns are set as a property on the row definition" -->
+          <!-- Position Column -->
+          <ng-container cdkColumnDef="id">
+            <th cdk-header-cell *matHeaderCellDef> No. </th>
+            <td cdk-cell *cdkCellDef="let element"> {{element.id}} </td>
+          </ng-container>
+
+          <!-- Name Column -->
+          <ng-container cdkColumnDef="temperature">
+            <th cdk-header-cell *matHeaderCellDef> Temperature </th>
+            <td cdk-cell *cdkCellDef="let element"> {{element.temperature}} </td>
+          </ng-container>
+
+          <!-- Weight Column -->
+          <ng-container cdkColumnDef="pressure">
+            <th cdk-header-cell *matHeaderCellDef> pressure </th>
+            <td cdk-cell *cdkCellDef="let element"> {{element.pressure}} </td>
+          </ng-container>
+
+          <!-- Symbol Column -->
+          <ng-container cdkColumnDef="humidity">
+            <th cdk-header-cell *matHeaderCellDef> humidity </th>
+            <td cdk-cell *cdkCellDef="let element"> {{element.humidity}} </td>
+          </ng-container>
+          <ng-container cdkColumnDef="readAt">
+            <th cdk-header-cell *matHeaderCellDef> readAt </th>
+            <td cdk-cell *cdkCellDef="let element"> {{element.readAt}} </td>
+          </ng-container>
+        </tr>
+        <tr cdk-header-row *cdkHeaderRowDef="displayedColumns"></tr>
+        <tr cdk-row *cdkRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+
+    </div>
+  </div>
+  <div *ngIf="busy" class="alert alert-warning" style="font-size:x-large;">
+    <br />
+    <br />
+    Loading . . .
+    <br />
+    <br />
+  </div>
+
+</div>

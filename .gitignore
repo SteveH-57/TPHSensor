@@ -1,0 +1,11 @@
+.vs/
+packages/
+*.vssscc
+node_modules/
+package-lock.json
+*/bin/
+*/obj/
+*/wwwroot/
+*/properties/
+*/node_modules/
+*/appsettings.*.json
